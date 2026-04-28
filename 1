@@ -1,0 +1,45 @@
+BUSINESS PROBLEM & WHY IT MATTERS
+Loss prevention and store operations teams monitor hundreds of POS terminals across the estate. They use dashboards showing override rates, void counts, and basket value distributions — but interpreting why a terminal is behaving anomalously requires digging through transaction logs and calling the store manager. This creates a 24–48 hours lag between an anomaly appearing and someone acting on it.
+Store Pulse applies statistical anomaly detection to terminal-level transaction data and uses an LLM to generate a plain-English explanation card — what is unusual, the likely operational cause, and a recommended action. Output is a daily digest that a regional manager can action in minutes, not hours.
+PRIMARY USERS
+Loss Prevention Analysts
+Regional / Area Managers
+Store Operations Leads
+DATA PACK NEEDED
+Two datasets: terminal transactions and store reference data.
+Store Transactions (CSV, ~2,000 rows)
+date, store_id, terminal_id, shift, transaction_count,
+ total_basket_value_gbp, avg_basket_gbp, void_count,
+ override_count, no_sale_count, manager_key_count,
+ price_override_count, refund_count, coupon_scan_failures
+Store Reference (CSV, ~50 rows)
+store_id, store_name, region, format, weekly_footfall_band
+Synthetic generation: Generate 50 stores × 3 terminals × 30 days via NumPy draws from normal distributions parameterised by store format. Inject anomalies in 5% of terminal-days (override_count 5–10× store mean).
+TECHNICAL APPROACH (RECOMMENDATIONS ONLY BUT YOU CAN USE SOMETHING ELSE) (Recommendations Only but you can use something else)
+Ingestion: Load CSV into Pandas. Compute per-terminal rolling 7-day mean and standard deviation for each metric.
+Retrieval: No retrieval layer — all context fits in the prompt.
+Prompt / Logic: System: You are a retail loss-prevention analyst. Given terminal statistics and deviations from normal, generate: (1) what is anomalous in plain English, (2) two to three ranked likely causes, (3) recommended action for the area manager.
+Model: Claude Haiku
+UI: Streamlit: date picker → flagged terminal list → click for explanation card. Colour-coded severity badges (WATCH / ALERT / URGENT). Export to CSV.
+MVP (5–6 hours): Anomaly detection + LLM card generation for a single selected date · list view + card detail.
+Stretch Goals: Trend sparklines per terminal · Acknowledge button that logs manager response · batch month generation with false-positive rate report.
+SIMPLE EVALUATION
+Metric
+	Target
+
+Anomaly recall
+	≥85% of injected anomaly days surfaced
+
+False positive rate
+	<10% of normal terminal-days flagged
+
+Card quality rubric
+	Human score 1–5: is the explanation actionable? Across 20 sampled cards
+
+DEMO SCRIPT (60–90 SECONDS)
+“A regional manager opens Store Pulse for Monday. Three terminals are flagged. She clicks Terminal T042-07 at Oxford Street. The card reads: 'Override count was 14 — 6× this terminal's 7-day average. Combined with 5 manager-key events, this pattern is consistent with either a till training issue or deliberate override abuse. Recommended action: review CCTV for this terminal between 09:00 and 13:00 and speak to the AM shift supervisor.' Without this tool, this anomaly would have appeared in a weekly report — three days later, buried in 200 rows of data.”
+RISKS & GUARDRAILS
+No colleague names or IDs — data is terminal-level only; no personally identifiable operator attribution.
+Human-in-loop mandate — card frames all outputs as possible causes, not conclusions. No automated HR action.
+Bias check — anomaly thresholds calibrated per store format, not a single global threshold.
+Transparency — every card shows raw metric values and z-scores alongside the narrative.
